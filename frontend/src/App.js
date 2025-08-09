@@ -68,7 +68,7 @@ Employer #2: Self-Employed – Uber, Lyft, DoorDash, Student Transportation — 
 
   const handleFillForm = async () => {
     if (!selectedFile) {
-      alert("Please select a PDF file");
+      alert("Please select a PDF file first");
       return;
     }
     
@@ -83,12 +83,16 @@ Employer #2: Self-Employed – Uber, Lyft, DoorDash, Student Transportation — 
       formData.append("file", selectedFile);
       formData.append("data", personalData);
 
+      console.log("Submitting form to:", `${API}/fill-form`);
+
       const response = await axios.post(`${API}/fill-form`, formData, {
         headers: {
           "Content-Type": "multipart/form-data",
         },
         responseType: "blob",
       });
+
+      console.log("Response received:", response);
 
       // Create download URL
       const blob = new Blob([response.data], { type: "application/pdf" });
@@ -112,19 +116,25 @@ Employer #2: Self-Employed – Uber, Lyft, DoorDash, Student Transportation — 
         }
       }
 
-      // Force download
+      console.log("Starting download with filename:", filename);
+
+      // Force download with better browser compatibility
       const link = document.createElement("a");
       link.href = downloadUrl;
       link.download = filename;
       link.style.display = 'none';
+      
+      // Add to DOM, click, and remove
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
 
+      console.log("Download initiated successfully");
+
       // Clean up URL after a delay
       setTimeout(() => {
         window.URL.revokeObjectURL(downloadUrl);
-      }, 1000);
+      }, 5000);
 
     } catch (error) {
       console.error("Error filling form:", error);
@@ -262,7 +272,7 @@ Current Address: YOUR_ADDRESS
               </div>
               
               <p className="text-green-700 mb-4">
-                Your form has been filled and downloaded automatically. You can also send it via email:
+                Your form has been filled and should have downloaded automatically. Check your Downloads folder for the PDF file.
               </p>
 
               <div className="flex gap-4">
@@ -352,9 +362,18 @@ Current Address: YOUR_ADDRESS
               <li>Upload any PDF form (job applications, legal forms, etc.)</li>
               <li>Enter your personal data or click "Load Default Data" for the example</li>
               <li>Click "Fill Form & Download" to process</li>
-              <li>The filled form will download automatically</li>
+              <li>The filled form will download automatically to your Downloads folder</li>
               <li>Optionally send the form via email to others</li>
             </ol>
+            
+            <div className="mt-4 p-3 bg-yellow-100 rounded border-l-4 border-yellow-500">
+              <p className="text-yellow-700 font-medium">
+                📁 Files download to your browser's Downloads folder (usually C:\Users\YourName\Downloads)
+              </p>
+              <p className="text-yellow-600 text-sm mt-1">
+                To save to D:\Completed Docs, change your browser's download location in settings
+              </p>
+            </div>
           </div>
         </div>
       </div>
