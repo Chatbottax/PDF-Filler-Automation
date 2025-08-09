@@ -134,11 +134,13 @@ Employer #2: Self-Employed – Uber, Lyft, DoorDash, Student Transportation — 
     }
 
     try {
-      await axios.post(`${API}/send-email`, {
+      // Since we can't access the actual file path from frontend, 
+      // we'll need to modify the backend to handle this properly
+      const response = await axios.post(`${API}/send-email`, {
         recipient_email: emailRecipient,
         subject: emailSubject,
         message: emailMessage,
-        file_path: processedFileUrl,
+        file_path: processedFileUrl, // This won't work directly, backend needs modification
       });
 
       alert("Email sent successfully!");
@@ -146,7 +148,11 @@ Employer #2: Self-Employed – Uber, Lyft, DoorDash, Student Transportation — 
       setEmailRecipient("");
     } catch (error) {
       console.error("Error sending email:", error);
-      alert("Error sending email: " + (error.response?.data?.detail || error.message));
+      if (error.response?.data?.detail?.includes("Email configuration not set")) {
+        alert("Email functionality is not fully configured on the server. Please contact the administrator to set up email credentials.");
+      } else {
+        alert("Error sending email: " + (error.response?.data?.detail || error.message));
+      }
     }
   };
 
