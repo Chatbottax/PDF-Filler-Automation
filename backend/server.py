@@ -213,7 +213,7 @@ def fill_pdf_form(pdf_path: str, personal_data: PersonalData) -> str:
         'Mobile Phone': personal_data.mobile_phone,
         'Email': personal_data.email,
         'Drivers License': personal_data.drivers_license,
-        'Driver's License': personal_data.drivers_license,
+        "Driver's License": personal_data.drivers_license,
         
         # Employment desired
         'Position Applying for': personal_data.position_applying,
