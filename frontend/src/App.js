@@ -95,6 +95,12 @@ Employer #2: Self-Employed – Uber, Lyft, DoorDash, Student Transportation — 
       const downloadUrl = window.URL.createObjectURL(blob);
       setProcessedFileUrl(downloadUrl);
 
+      // Get session ID from headers
+      const sessionId = response.headers['x-session-id'];
+      if (sessionId) {
+        setSessionId(sessionId);
+      }
+
       // Get filename from response headers or create default
       const contentDisposition = response.headers['content-disposition'];
       let filename = `filled_form_${new Date().toISOString().slice(0, 10)}.pdf`;
