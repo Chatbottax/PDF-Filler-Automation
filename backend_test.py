@@ -166,7 +166,7 @@ Employer #2: Self-Employed – Uber, Lyft, DoorDash, Student Transportation — 
             "recipient_email": "test@example.com",
             "subject": "Test Form",
             "message": "Test message",
-            "file_path": "/tmp/nonexistent.pdf"
+            "session_id": "invalid-session-id"
         }
         
         success, response = self.run_test(
