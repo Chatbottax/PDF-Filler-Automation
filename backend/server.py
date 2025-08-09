@@ -311,10 +311,19 @@ async def fill_form(
         # Clean up input file
         os.unlink(temp_input)
         
+        # Generate filename
+        filename = f"filled_form_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+        
         return FileResponse(
             filled_pdf_path,
             media_type='application/pdf',
-            filename=f"filled_form_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+            filename=filename,
+            headers={
+                "Content-Disposition": f"attachment; filename={filename}",
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0"
+            }
         )
         
     except Exception as e:
