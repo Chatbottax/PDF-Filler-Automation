@@ -135,19 +135,17 @@ Employer #2: Self-Employed – Uber, Lyft, DoorDash, Student Transportation — 
   };
 
   const handleSendEmail = async () => {
-    if (!emailRecipient || !processedFileUrl) {
+    if (!emailRecipient || !sessionId) {
       alert("Please fill the form first and enter recipient email");
       return;
     }
 
     try {
-      // Since we can't access the actual file path from frontend, 
-      // we'll need to modify the backend to handle this properly
       const response = await axios.post(`${API}/send-email`, {
         recipient_email: emailRecipient,
         subject: emailSubject,
         message: emailMessage,
-        file_path: processedFileUrl, // This won't work directly, backend needs modification
+        session_id: sessionId,
       });
 
       alert("Email sent successfully!");
@@ -156,7 +154,7 @@ Employer #2: Self-Employed – Uber, Lyft, DoorDash, Student Transportation — 
     } catch (error) {
       console.error("Error sending email:", error);
       if (error.response?.data?.detail?.includes("Email configuration not set")) {
-        alert("Email functionality is not fully configured on the server. Please contact the administrator to set up email credentials.");
+        alert("⚠️ Email functionality requires setup:\n\n1. Add your Gmail credentials to backend/.env:\n   SENDER_EMAIL=\"your-email@gmail.com\"\n   SENDER_PASSWORD=\"your-app-password\"\n\n2. Restart the backend service\n\nFor now, please download the form and send it manually.");
       } else {
         alert("Error sending email: " + (error.response?.data?.detail || error.message));
       }
