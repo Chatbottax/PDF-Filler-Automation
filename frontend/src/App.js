@@ -10,6 +10,7 @@ function App() {
   const [selectedFile, setSelectedFile] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processedFileUrl, setProcessedFileUrl] = useState(null);
+  const [sessionId, setSessionId] = useState(null);
   const [emailRecipient, setEmailRecipient] = useState("");
   const [emailSubject, setEmailSubject] = useState("Completed Form");
   const [emailMessage, setEmailMessage] = useState("Please find the completed form attached.");
