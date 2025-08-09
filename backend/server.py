@@ -313,13 +313,23 @@ async def fill_form(
         # Fill the form
         filled_pdf_path = fill_pdf_form(temp_input, parsed_data)
         
+        # Generate session ID for email functionality
+        session_id = str(uuid.uuid4())
+        
+        # Store file path for potential email sending
+        file_sessions[session_id] = {
+            'file_path': filled_pdf_path,
+            'timestamp': datetime.utcnow(),
+            'original_filename': file.filename
+        }
+        
         # Clean up input file
         os.unlink(temp_input)
         
         # Generate filename
         filename = f"filled_form_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
         
-        return FileResponse(
+        response = FileResponse(
             filled_pdf_path,
             media_type='application/pdf',
             filename=filename,
@@ -327,9 +337,12 @@ async def fill_form(
                 "Content-Disposition": f"attachment; filename={filename}",
                 "Cache-Control": "no-cache, no-store, must-revalidate",
                 "Pragma": "no-cache",
-                "Expires": "0"
+                "Expires": "0",
+                "X-Session-ID": session_id  # Send session ID to frontend
             }
         )
+        
+        return response
         
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Error filling form: {str(e)}")
