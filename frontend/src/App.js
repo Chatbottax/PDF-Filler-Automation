@@ -94,13 +94,30 @@ Employer #2: Self-Employed – Uber, Lyft, DoorDash, Student Transportation — 
       const downloadUrl = window.URL.createObjectURL(blob);
       setProcessedFileUrl(downloadUrl);
 
-      // Auto-download
+      // Get filename from response headers or create default
+      const contentDisposition = response.headers['content-disposition'];
+      let filename = `filled_form_${new Date().toISOString().slice(0, 10)}.pdf`;
+      
+      if (contentDisposition) {
+        const matches = contentDisposition.match(/filename="?([^"]*)"?/);
+        if (matches && matches[1]) {
+          filename = matches[1];
+        }
+      }
+
+      // Force download
       const link = document.createElement("a");
       link.href = downloadUrl;
-      link.download = `filled_form_${new Date().toISOString().slice(0, 10)}.pdf`;
+      link.download = filename;
+      link.style.display = 'none';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+
+      // Clean up URL after a delay
+      setTimeout(() => {
+        window.URL.revokeObjectURL(downloadUrl);
+      }, 1000);
 
     } catch (error) {
       console.error("Error filling form:", error);
