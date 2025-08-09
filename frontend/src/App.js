@@ -118,18 +118,45 @@ Employer #2: Self-Employed – Uber, Lyft, DoorDash, Student Transportation — 
 
       console.log("Starting download with filename:", filename);
 
-      // Force download with better browser compatibility
+      // Force download with multiple fallback methods
+      console.log("Starting download with filename:", filename);
+
+      // Method 1: Standard download
       const link = document.createElement("a");
       link.href = downloadUrl;
       link.download = filename;
       link.style.display = 'none';
       
-      // Add to DOM, click, and remove
+      // Method 2: Add click event handler
+      link.addEventListener('click', function() {
+        console.log("Download link clicked");
+      });
+      
+      // Method 3: Force target blank as fallback
+      link.target = '_blank';
+      
+      console.log("Adding link to DOM and clicking...");
       document.body.appendChild(link);
+      
+      // Force click with multiple methods
       link.click();
+      
+      // Alternative click method
+      const event = new MouseEvent('click', {
+        view: window,
+        bubbles: true,
+        cancelable: true
+      });
+      link.dispatchEvent(event);
+      
+      console.log("Download should have initiated");
       document.body.removeChild(link);
 
-      console.log("Download initiated successfully");
+      // Method 4: Direct window.open as fallback
+      setTimeout(() => {
+        console.log("Trying window.open as fallback");
+        window.open(downloadUrl, '_blank');
+      }, 1000);
 
       // Clean up URL after a delay
       setTimeout(() => {
