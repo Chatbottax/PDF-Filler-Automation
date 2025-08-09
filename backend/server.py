@@ -18,6 +18,11 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email import encoders
 from email.mime.text import MIMEText
+import json
+import threading
+
+# Global storage for temporary file sessions
+file_sessions = {}
 
 
 ROOT_DIR = Path(__file__).parent
