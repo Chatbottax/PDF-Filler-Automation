@@ -351,14 +351,27 @@ async def fill_form(
 async def send_email(request: EmailRequest):
     """Send filled PDF via email."""
     try:
-        # Configure email settings (you'll need to set these in .env)
+        # Get file path from session
+        session_info = file_sessions.get(request.session_id)
+        if not session_info:
+            raise HTTPException(status_code=400, detail="Invalid session ID or file expired")
+        
+        file_path = session_info['file_path']
+        
+        if not os.path.exists(file_path):
+            raise HTTPException(status_code=400, detail="File not found")
+        
+        # Configure email settings
         smtp_server = os.environ.get('SMTP_SERVER', 'smtp.gmail.com')
         smtp_port = int(os.environ.get('SMTP_PORT', '587'))
         sender_email = os.environ.get('SENDER_EMAIL', '')
         sender_password = os.environ.get('SENDER_PASSWORD', '')
         
-        if not sender_email or not sender_password:
-            raise HTTPException(status_code=400, detail="Email configuration not set")
+        if not sender_email or not sender_password or sender_email == "demo@example.com":
+            raise HTTPException(
+                status_code=400, 
+                detail="Email configuration not set. Please configure SENDER_EMAIL and SENDER_PASSWORD in the backend .env file."
+            )
         
         # Create message
         msg = MIMEMultipart()
@@ -370,16 +383,15 @@ async def send_email(request: EmailRequest):
         msg.attach(MIMEText(request.message, 'plain'))
         
         # Add attachment
-        if os.path.exists(request.file_path):
-            with open(request.file_path, "rb") as attachment:
-                part = MIMEBase('application', 'octet-stream')
-                part.set_payload(attachment.read())
-                encoders.encode_base64(part)
-                part.add_header(
-                    'Content-Disposition',
-                    f'attachment; filename= completed_form.pdf'
-                )
-                msg.attach(part)
+        with open(file_path, "rb") as attachment:
+            part = MIMEBase('application', 'octet-stream')
+            part.set_payload(attachment.read())
+            encoders.encode_base64(part)
+            part.add_header(
+                'Content-Disposition',
+                f'attachment; filename=completed_form.pdf'
+            )
+            msg.attach(part)
         
         # Send email
         server = smtplib.SMTP(smtp_server, smtp_port)
