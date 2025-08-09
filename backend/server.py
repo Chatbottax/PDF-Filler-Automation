@@ -495,10 +495,25 @@ async def test_download():
 </html>'''
     return HTMLResponse(content=html_content)
 
-@app.get("/content.pdf")
-async def get_content_pdf():
-    """Serve the content PDF file for testing."""
-    return FileResponse("/app/content.pdf", media_type="application/pdf")
+@api_router.get("/download-test/{filename}")
+async def download_test_file(filename: str):
+    """Direct download link that bypasses JavaScript."""
+    # Use the sample PDF for testing
+    pdf_path = "/app/content.pdf"
+    
+    if not os.path.exists(pdf_path):
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    return FileResponse(
+        pdf_path,
+        media_type='application/pdf',
+        filename=f"DIRECT_DOWNLOAD_{filename}.pdf",
+        headers={
+            "Content-Disposition": f"attachment; filename=DIRECT_DOWNLOAD_{filename}.pdf",
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache"
+        }
+    )
 
 # Include the router in the main app
 app.include_router(api_router)
