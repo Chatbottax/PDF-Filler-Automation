@@ -408,6 +408,98 @@ async def send_email(request: EmailRequest):
         raise HTTPException(status_code=400, detail=f"Error sending email: {str(e)}")
 
 
+@app.get("/test-download")
+async def test_download():
+    """Simple download test page."""
+    html_content = '''<!DOCTYPE html>
+<html>
+<head>
+    <title>Download Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        button { background: #007bff; color: white; padding: 15px 30px; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        #result { margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <h1>PDF Form Download Test</h1>
+    <p>This tests if downloads work directly from your browser:</p>
+    
+    <button onclick="testDownload()">Test Download Now</button>
+    
+    <div id="result"></div>
+
+    <script>
+        async function testDownload() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '<p>Testing download...</p>';
+            
+            try {
+                console.log('Starting download test...');
+                
+                const testData = 'Last Name: TEST\\nFirst Name: DOWNLOAD_TEST';
+                
+                const formData = new FormData();
+                
+                // Create a simple text file as PDF (for testing)
+                const testBlob = new Blob(['%PDF test'], { type: 'application/pdf' });
+                formData.append('file', testBlob, 'test.pdf');
+                formData.append('data', testData);
+                
+                console.log('Submitting to API...');
+                
+                const response = await fetch('/api/fill-form', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                console.log('Response status:', response.status);
+                console.log('Response headers:', [...response.headers.entries()]);
+                
+                if (response.ok) {
+                    const blob = await response.blob();
+                    console.log('Received blob size:', blob.size);
+                    
+                    // Create download URL
+                    const url = window.URL.createObjectURL(blob);
+                    console.log('Created URL:', url);
+                    
+                    // Create and trigger download
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = 'download_test.pdf';
+                    link.style.display = 'none';
+                    
+                    console.log('Adding link to DOM and clicking...');
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    
+                    // Clean up
+                    setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+                    
+                    resultDiv.innerHTML = '<p style="color: green;">✅ Download completed! Check your D:\\\\Completed Docs folder or Downloads folder for download_test.pdf</p>';
+                } else {
+                    const errorText = await response.text();
+                    throw new Error(`HTTP ${response.status}: ${errorText}`);
+                }
+                
+            } catch (error) {
+                console.error('Download test failed:', error);
+                resultDiv.innerHTML = `<p style="color: red;">❌ Download test failed: ${error.message}</p><p>Check browser console for details.</p>`;
+            }
+        }
+    </script>
+</body>
+</html>'''
+    return HTMLResponse(content=html_content)
+
+@app.get("/content.pdf")
+async def get_content_pdf():
+    """Serve the content PDF file for testing."""
+    return FileResponse("/app/content.pdf", media_type="application/pdf")
+
 # Include the router in the main app
 app.include_router(api_router)
 
