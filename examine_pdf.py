@@ -25,7 +25,7 @@ def examine_pdf_with_pymupdf(pdf_path):
         page = doc[page_num]
         
         # Get form fields (widgets)
-        widgets = page.widgets()
+        widgets = list(page.widgets())
         if widgets:
             has_form_fields = True
             print(f"\nPage {page_num + 1} has {len(widgets)} form field(s):")
