@@ -1,10 +1,8 @@
 from fastapi import FastAPI, APIRouter, File, UploadFile, Form, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
-from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
-import os
 import logging
 from pathlib import Path
 from pydantic import BaseModel, Field
@@ -21,18 +19,24 @@ from email import encoders
 from email.mime.text import MIMEText
 import json
 import threading
+import os
 
-# Global storage for temporary file sessions
-file_sessions = {}
+# === HARD-CODED CONFIG (SAMIA) ===
+MONGO_URL = "mongodb+srv://samiabd2304:Rsrayray%40123@cluster0.qdgfwpv.mongodb.net/pdf_filler?retryWrites=true&w=majority&appName=Cluster0"
+DB_NAME = "pdf_filler"
 
+SMTP_SERVER = "smtp.gmail.com"
+SMTP_PORT = 587
+SENDER_EMAIL = "samiabd2304@gmail.com"
+SENDER_PASSWORD = "Rsrayray@123"
+
+CORS_ORIGINS = ["*"]
 
 ROOT_DIR = Path(__file__).parent
-load_dotenv(ROOT_DIR / '.env')
 
 # MongoDB connection
-mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
+client = AsyncIOMotorClient(MONGO_URL)
+db = client[DB_NAME]
 
 # Create the main app without a prefix
 app = FastAPI()
@@ -40,6 +44,8 @@ app = FastAPI()
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
 
+# Global storage for temporary file sessions
+file_sessions = {}
 
 # Define Models
 class PersonalData(BaseModel):
@@ -270,16 +276,16 @@ def fill_pdf_form(pdf_path: str, personal_data: PersonalData) -> str:
             field_name = widget.field_name
             field_value = field_mapping.get(field_name, "")
             
-            if field_value and widget.field_type in (fitz.PDF_WIDGET_TYPE_TEXT,):
+            if field_value and widget.field_type == fitz.PDF_WIDGET_TYPE_TEXT:
                 widget.field_value = str(field_value)
                 widget.update()
     
-    # Save filled PDF
-    output_path = f"/tmp/filled_form_{uuid.uuid4()}.pdf"
-    doc.save(output_path)
+    # Save filled PDF to temp directory
+    output_path = Path(tempfile.gettempdir()) / f"filled_form_{uuid.uuid4()}.pdf"
+    doc.save(str(output_path))
     doc.close()
     
-    return output_path
+    return str(output_path)
 
 
 # API Routes
@@ -307,12 +313,12 @@ async def fill_form(
         parsed_data = parse_personal_data(data)
         
         # Save uploaded file temporarily
-        temp_input = f"/tmp/input_{uuid.uuid4()}.pdf"
+        temp_input = Path(tempfile.gettempdir()) / f"input_{uuid.uuid4()}.pdf"
         with open(temp_input, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
         
         # Fill the form
-        filled_pdf_path = fill_pdf_form(temp_input, parsed_data)
+        filled_pdf_path = fill_pdf_form(str(temp_input), parsed_data)
         
         # Generate session ID for email functionality
         session_id = str(uuid.uuid4())
@@ -325,7 +331,7 @@ async def fill_form(
         }
         
         # Clean up input file
-        os.unlink(temp_input)
+        temp_input.unlink(missing_ok=True)
         
         # Generate filename
         filename = f"filled_form_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
@@ -339,7 +345,8 @@ async def fill_form(
                 "Cache-Control": "no-cache, no-store, must-revalidate",
                 "Pragma": "no-cache",
                 "Expires": "0",
-                "X-Session-ID": session_id  # Send session ID to frontend
+                "X-Session-ID": session_id,
+                "Access-Control-Expose-Headers": "X-Session-ID"
             }
         )
         
@@ -362,21 +369,9 @@ async def send_email(request: EmailRequest):
         if not os.path.exists(file_path):
             raise HTTPException(status_code=400, detail="File not found")
         
-        # Configure email settings
-        smtp_server = os.environ.get('SMTP_SERVER', 'smtp.gmail.com')
-        smtp_port = int(os.environ.get('SMTP_PORT', '587'))
-        sender_email = os.environ.get('SENDER_EMAIL', '')
-        sender_password = os.environ.get('SENDER_PASSWORD', '')
-        
-        if not sender_email or not sender_password or sender_email == "demo@example.com":
-            raise HTTPException(
-                status_code=400, 
-                detail="Email configuration not set. Please configure SENDER_EMAIL and SENDER_PASSWORD in the backend .env file."
-            )
-        
         # Create message
         msg = MIMEMultipart()
-        msg['From'] = sender_email
+        msg['From'] = SENDER_EMAIL
         msg['To'] = request.recipient_email
         msg['Subject'] = request.subject
         
@@ -395,11 +390,10 @@ async def send_email(request: EmailRequest):
             msg.attach(part)
         
         # Send email
-        server = smtplib.SMTP(smtp_server, smtp_port)
+        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
         server.starttls()
-        server.login(sender_email, sender_password)
-        text = msg.as_string()
-        server.sendmail(sender_email, request.recipient_email, text)
+        server.login(SENDER_EMAIL, SENDER_PASSWORD)
+        server.sendmail(SENDER_EMAIL, request.recipient_email, msg.as_string())
         server.quit()
         
         return {"success": True, "message": "Email sent successfully"}
@@ -407,6 +401,25 @@ async def send_email(request: EmailRequest):
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Error sending email: {str(e)}")
 
+@api_router.get("/download-test/{filename}")
+async def download_test_file(filename: str):
+    """Direct download link that bypasses JavaScript."""
+    # Use the sample PDF for testing
+    content_pdf = ROOT_DIR / "content.pdf"
+    
+    if not content_pdf.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    return FileResponse(
+        str(content_pdf),
+        media_type='application/pdf',
+        filename=f"DIRECT_DOWNLOAD_{filename}.pdf",
+        headers={
+            "Content-Disposition": f"attachment; filename=DIRECT_DOWNLOAD_{filename}.pdf",
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache"
+        }
+    )
 
 @app.get("/test-download")
 async def test_download():
@@ -414,40 +427,55 @@ async def test_download():
     html_content = '''<!DOCTYPE html>
 <html>
 <head>
-    <title>Download Test</title>
+    <title>Download Test - SAMIA</title>
     <style>
         body { font-family: Arial, sans-serif; padding: 20px; }
-        button { background: #007bff; color: white; padding: 15px 30px; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; }
+        button { background: #007bff; color: white; padding: 15px 30px; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; margin: 10px; }
         button:hover { background: #0056b3; }
         #result { margin-top: 20px; }
+        .success { color: green; }
+        .error { color: red; }
     </style>
 </head>
 <body>
-    <h1>PDF Form Download Test</h1>
-    <p>This tests if downloads work directly from your browser:</p>
+    <h1>PDF Form Download Test for SAMIA</h1>
+    <p><strong>Download location:</strong> D:\\Completed Docs (as configured in Chrome)</p>
     
-    <button onclick="testDownload()">Test Download Now</button>
+    <button onclick="testDirectDownload()">Test Direct Download</button>
+    <button onclick="testAPIDownload()">Test API Download</button>
     
     <div id="result"></div>
 
     <script>
-        async function testDownload() {
+        function testDirectDownload() {
             const resultDiv = document.getElementById('result');
-            resultDiv.innerHTML = '<p>Testing download...</p>';
+            resultDiv.innerHTML = '<p>Testing direct download...</p>';
+            
+            // Direct download link
+            window.location.href = '/api/download-test/samia_test';
+            
+            setTimeout(() => {
+                resultDiv.innerHTML = '<p class="success">✅ Direct download initiated! Check D:\\\\Completed Docs for DIRECT_DOWNLOAD_samia_test.pdf</p>';
+            }, 1000);
+        }
+        
+        async function testAPIDownload() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '<p>Testing API download...</p>';
             
             try {
-                console.log('Starting download test...');
-                
-                const testData = 'Last Name: TEST\\nFirst Name: DOWNLOAD_TEST';
+                const testData = 'Last Name: ALSQOUR\\nFirst Name: NAEL OMAR MOHAMMAD\\nPosition Applying For: Driver';
                 
                 const formData = new FormData();
                 
-                // Create a simple text file as PDF (for testing)
-                const testBlob = new Blob(['%PDF test'], { type: 'application/pdf' });
-                formData.append('file', testBlob, 'test.pdf');
+                // Get the content PDF first
+                const contentResponse = await fetch('/content.pdf');
+                const contentBlob = await contentResponse.blob();
+                
+                formData.append('file', contentBlob, 'content.pdf');
                 formData.append('data', testData);
                 
-                console.log('Submitting to API...');
+                console.log('Submitting to fill-form API...');
                 
                 const response = await fetch('/api/fill-form', {
                     method: 'POST',
@@ -461,6 +489,10 @@ async def test_download():
                     const blob = await response.blob();
                     console.log('Received blob size:', blob.size);
                     
+                    // Get session ID
+                    const sessionId = response.headers.get('X-Session-ID');
+                    console.log('Session ID:', sessionId);
+                    
                     // Create download URL
                     const url = window.URL.createObjectURL(blob);
                     console.log('Created URL:', url);
@@ -468,7 +500,7 @@ async def test_download():
                     // Create and trigger download
                     const link = document.createElement('a');
                     link.href = url;
-                    link.download = 'download_test.pdf';
+                    link.download = 'samia_filled_form.pdf';
                     link.style.display = 'none';
                     
                     console.log('Adding link to DOM and clicking...');
@@ -479,15 +511,40 @@ async def test_download():
                     // Clean up
                     setTimeout(() => window.URL.revokeObjectURL(url), 1000);
                     
-                    resultDiv.innerHTML = '<p style="color: green;">✅ Download completed! Check your D:\\\\Completed Docs folder or Downloads folder for download_test.pdf</p>';
+                    resultDiv.innerHTML = '<p class="success">✅ API download completed! Check D:\\\\Completed Docs for samia_filled_form.pdf</p>';
+                    
+                    // Test email functionality too
+                    if (sessionId) {
+                        resultDiv.innerHTML += '<p>Testing email functionality...</p>';
+                        
+                        const emailResponse = await fetch('/api/send-email', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                recipient_email: 'samiabd2304@gmail.com',
+                                subject: 'Test Filled Form',
+                                message: 'This is a test of the PDF form filling system.',
+                                session_id: sessionId
+                            })
+                        });
+                        
+                        if (emailResponse.ok) {
+                            resultDiv.innerHTML += '<p class="success">✅ Email sent successfully to samiabd2304@gmail.com!</p>';
+                        } else {
+                            const errorText = await emailResponse.text();
+                            resultDiv.innerHTML += '<p class="error">❌ Email failed: ' + errorText + '</p>';
+                        }
+                    }
                 } else {
                     const errorText = await response.text();
                     throw new Error(`HTTP ${response.status}: ${errorText}`);
                 }
                 
             } catch (error) {
-                console.error('Download test failed:', error);
-                resultDiv.innerHTML = `<p style="color: red;">❌ Download test failed: ${error.message}</p><p>Check browser console for details.</p>`;
+                console.error('API download test failed:', error);
+                resultDiv.innerHTML = `<p class="error">❌ API download test failed: ${error.message}</p><p>Check browser console for details.</p>`;
             }
         }
     </script>
@@ -495,25 +552,13 @@ async def test_download():
 </html>'''
     return HTMLResponse(content=html_content)
 
-@api_router.get("/download-test/{filename}")
-async def download_test_file(filename: str):
-    """Direct download link that bypasses JavaScript."""
-    # Use the sample PDF for testing
-    pdf_path = "/app/content.pdf"
-    
-    if not os.path.exists(pdf_path):
-        raise HTTPException(status_code=404, detail="File not found")
-    
-    return FileResponse(
-        pdf_path,
-        media_type='application/pdf',
-        filename=f"DIRECT_DOWNLOAD_{filename}.pdf",
-        headers={
-            "Content-Disposition": f"attachment; filename=DIRECT_DOWNLOAD_{filename}.pdf",
-            "Cache-Control": "no-cache, no-store, must-revalidate",
-            "Pragma": "no-cache"
-        }
-    )
+@app.get("/content.pdf")
+async def get_content_pdf():
+    """Serve the content PDF file for testing."""
+    content_pdf = ROOT_DIR / "content.pdf"
+    if not content_pdf.exists():
+        raise HTTPException(status_code=404, detail="Content PDF not found")
+    return FileResponse(str(content_pdf), media_type="application/pdf")
 
 # Include the router in the main app
 app.include_router(api_router)
@@ -521,7 +566,7 @@ app.include_router(api_router)
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
+    allow_origins=CORS_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
 )
