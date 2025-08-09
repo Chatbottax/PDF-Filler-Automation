@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Direct Download Test</title>
+</head>
+<body>
+    <h1>Direct Download Test</h1>
+    <p>Click the button below to test if downloads work from this browser:</p>
+    
+    <button onclick="testDownload()" style="background: blue; color: white; padding: 10px 20px; font-size: 16px;">
+        Test Download Now
+    </button>
+    
+    <div id="result"></div>
+
+    <script>
+        async function testDownload() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '<p>Testing download...</p>';
+            
+            try {
+                console.log('Starting download test...');
+                
+                // Create form data
+                const formData = new FormData();
+                
+                // We need to get the test PDF file first
+                const pdfResponse = await fetch('/content.pdf');
+                const pdfBlob = await pdfResponse.blob();
+                
+                formData.append('file', pdfBlob, 'content.pdf');
+                formData.append('data', 'Last Name: DOWNLOAD_TEST\nFirst Name: WORKING');
+                
+                console.log('Submitting to API...');
+                
+                const response = await fetch('/api/fill-form', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                console.log('Response status:', response.status);
+                
+                if (response.ok) {
+                    const blob = await response.blob();
+                    console.log('Blob size:', blob.size);
+                    
+                    // Create download
+                    const url = window.URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = 'test_download.pdf';
+                    
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    
+                    window.URL.revokeObjectURL(url);
+                    
+                    resultDiv.innerHTML = '<p style="color: green;">✅ Download successful! Check your Downloads folder for test_download.pdf</p>';
+                } else {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+            } catch (error) {
+                console.error('Download failed:', error);
+                resultDiv.innerHTML = `<p style="color: red;">❌ Download failed: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>
