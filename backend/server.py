@@ -110,7 +110,7 @@ class EmailRequest(BaseModel):
     recipient_email: str
     subject: str = "Completed Form"
     message: str = "Please find the completed form attached."
-    file_path: str
+    session_id: str
 
 
 # Data parsing function
