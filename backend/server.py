@@ -428,38 +428,60 @@ async def fill_form(
     file: UploadFile = File(...),
     data: str = Form(...)
 ):
-    """Fill PDF form with provided data."""
+    """Fill PDF or Word form with provided data - ENHANCED VERSION."""
     try:
         # Parse personal data
         parsed_data = parse_personal_data(data)
         
+        # Get file extension
+        file_extension = Path(file.filename).suffix.lower()
+        
         # Save uploaded file temporarily
-        temp_input = Path(tempfile.gettempdir()) / f"input_{uuid.uuid4()}.pdf"
+        temp_input = Path(tempfile.gettempdir()) / f"input_{uuid.uuid4()}{file_extension}"
         with open(temp_input, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
         
-        # Fill the form
-        filled_pdf_path = fill_pdf_form(str(temp_input), parsed_data)
+        # Process based on file type
+        if file_extension == '.pdf':
+            filled_file_path, processing_report = fill_pdf_form(str(temp_input), parsed_data)
+            output_extension = '.pdf'
+            media_type = 'application/pdf'
+        elif file_extension in ['.docx', '.doc']:
+            filled_file_path, processing_report = fill_word_form(str(temp_input), parsed_data)
+            output_extension = '.docx'
+            media_type = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        else:
+            raise HTTPException(status_code=400, detail=f"Unsupported file type: {file_extension}. Please use PDF or Word documents.")
+        
+        if not filled_file_path:
+            raise HTTPException(status_code=400, detail="Failed to process document")
         
         # Generate session ID for email functionality
         session_id = str(uuid.uuid4())
         
-        # Store file path for potential email sending
+        # Store file path and processing report for potential email sending
         file_sessions[session_id] = {
-            'file_path': filled_pdf_path,
+            'file_path': filled_file_path,
             'timestamp': datetime.utcnow(),
-            'original_filename': file.filename
+            'original_filename': file.filename,
+            'processing_report': processing_report
         }
         
         # Clean up input file
         temp_input.unlink(missing_ok=True)
         
         # Generate filename
-        filename = f"filled_form_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+        base_name = Path(file.filename).stem
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"FILLED_{base_name}_{timestamp}{output_extension}"
+        
+        # Create report summary for headers
+        filled_count = len([r for r in processing_report if r.startswith('✅')])
+        skipped_count = len([r for r in processing_report if r.startswith('⚪') or r.startswith('❌')])
         
         response = FileResponse(
-            filled_pdf_path,
-            media_type='application/pdf',
+            filled_file_path,
+            media_type=media_type,
             filename=filename,
             headers={
                 "Content-Disposition": f"attachment; filename={filename}",
@@ -467,14 +489,30 @@ async def fill_form(
                 "Pragma": "no-cache",
                 "Expires": "0",
                 "X-Session-ID": session_id,
-                "Access-Control-Expose-Headers": "X-Session-ID"
+                "X-Fields-Filled": str(filled_count),
+                "X-Fields-Skipped": str(skipped_count),
+                "Access-Control-Expose-Headers": "X-Session-ID,X-Fields-Filled,X-Fields-Skipped"
             }
         )
         
         return response
         
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Error filling form: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Error processing form: {str(e)}")
+
+@api_router.get("/processing-report/{session_id}")
+async def get_processing_report(session_id: str):
+    """Get detailed processing report for a filled form."""
+    session_info = file_sessions.get(session_id)
+    if not session_info:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    return {
+        "session_id": session_id,
+        "original_filename": session_info.get('original_filename'),
+        "processing_report": session_info.get('processing_report', []),
+        "timestamp": session_info.get('timestamp')
+    }
 
 @api_router.post("/send-email")
 async def send_email(request: EmailRequest):
