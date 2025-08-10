@@ -713,14 +713,14 @@ async def test_download():
 
 @app.get("/working-form")
 async def working_form():
-    """Simple working form that actually downloads files."""
+    """Enhanced form that works with PDF and Word documents."""
     html_content = '''<!DOCTYPE html>
 <html>
 <head>
-    <title>PDF Form Filler - WORKING VERSION</title>
+    <title>PDF & Word Form Filler - ENHANCED</title>
     <style>
         body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
-        .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .container { max-width: 900px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
         h1 { color: #333; text-align: center; }
         .form-group { margin: 20px 0; }
         label { display: block; font-weight: bold; margin-bottom: 5px; }
@@ -731,29 +731,44 @@ async def working_form():
         button:disabled { background: #ccc; cursor: not-allowed; }
         .success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 15px; border-radius: 5px; margin: 20px 0; }
         .error { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; padding: 15px; border-radius: 5px; margin: 20px 0; }
+        .report { background: #f8f9fa; border: 1px solid #dee2e6; padding: 15px; border-radius: 5px; margin: 10px 0; max-height: 300px; overflow-y: auto; }
+        .report-item { margin: 5px 0; font-family: monospace; font-size: 12px; }
+        .filled { color: #28a745; }
+        .skipped { color: #6c757d; }
+        .failed { color: #dc3545; }
+        .file-types { background: #e9ecef; padding: 10px; border-radius: 5px; margin: 10px 0; font-size: 14px; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>PDF Form Filler - SAMIA</h1>
-        <p><strong>This version WILL download to your D:\\Completed Docs folder</strong></p>
+        <h1>📄 PDF & Word Form Filler</h1>
+        <p><strong>Enhanced version with detailed reporting</strong></p>
+        
+        <div class="file-types">
+            <strong>Supported formats:</strong> PDF (.pdf), Word (.docx, .doc)<br>
+            <strong>Download location:</strong> D:\\Completed Docs (as configured in your browser)
+        </div>
         
         <form id="pdfForm" enctype="multipart/form-data">
             <div class="form-group">
-                <label for="pdfFile">1. Select PDF Form:</label>
-                <input type="file" id="pdfFile" name="file" accept=".pdf" required>
+                <label for="pdfFile">1. Select Form Document:</label>
+                <input type="file" id="pdfFile" name="file" accept=".pdf,.doc,.docx" required>
+                <small>Choose PDF forms or Word documents with fillable fields or placeholders</small>
             </div>
             
             <div class="form-group">
                 <label for="personalData">2. Personal Data:</label>
                 <button type="button" onclick="loadNaelData()">Load Nael's Data</button>
+                <button type="button" onclick="clearData()">Clear</button>
                 <textarea id="personalData" name="data" placeholder="Click 'Load Nael's Data' or paste personal information here..."></textarea>
+                <small>Format: "Field Name: Value" on each line. Use [Leave Blank] for empty fields.</small>
             </div>
             
             <button type="submit" id="submitBtn">Fill Form & Download</button>
         </form>
         
         <div id="result"></div>
+        <div id="processingReport"></div>
     </div>
 
     <script>
@@ -796,18 +811,23 @@ Employer #2: Self-Employed – Uber, Lyft, DoorDash, Student Transportation — 
         function loadNaelData() {
             document.getElementById('personalData').value = naelData;
         }
+        
+        function clearData() {
+            document.getElementById('personalData').value = '';
+        }
 
         document.getElementById('pdfForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
             const resultDiv = document.getElementById('result');
+            const reportDiv = document.getElementById('processingReport');
             const submitBtn = document.getElementById('submitBtn');
             
             const fileInput = document.getElementById('pdfFile');
             const dataInput = document.getElementById('personalData');
             
             if (!fileInput.files[0]) {
-                resultDiv.innerHTML = '<div class="error">❌ Please select a PDF file</div>';
+                resultDiv.innerHTML = '<div class="error">❌ Please select a PDF or Word document</div>';
                 return;
             }
             
@@ -819,6 +839,7 @@ Employer #2: Self-Employed – Uber, Lyft, DoorDash, Student Transportation — 
             submitBtn.disabled = true;
             submitBtn.textContent = 'Processing...';
             resultDiv.innerHTML = '<div>🔄 Processing your form...</div>';
+            reportDiv.innerHTML = '';
             
             try {
                 const formData = new FormData();
@@ -840,7 +861,12 @@ Employer #2: Self-Employed – Uber, Lyft, DoorDash, Student Transportation — 
                     throw new Error(`Server error: ${response.status} - ${errorText}`);
                 }
                 
-                // Get the PDF blob
+                // Get processing statistics from headers
+                const fieldsFilled = response.headers.get('X-Fields-Filled') || '0';
+                const fieldsSkipped = response.headers.get('X-Fields-Skipped') || '0';
+                const sessionId = response.headers.get('X-Session-ID');
+                
+                // Get the file blob
                 const blob = await response.blob();
                 console.log('Received blob size:', blob.size);
                 
@@ -884,37 +910,60 @@ Employer #2: Self-Employed – Uber, Lyft, DoorDash, Student Transportation — 
                     }
                 }, 500);
                 
-                // Method 3: Force download via iframe (another fallback)
-                const iframe = document.createElement('iframe');
-                iframe.style.display = 'none';
-                iframe.src = url;
-                document.body.appendChild(iframe);
-                setTimeout(() => {
-                    document.body.removeChild(iframe);
-                    window.URL.revokeObjectURL(url);
-                }, 3000);
-                
-                // Show success message
+                // Show success message with statistics
                 resultDiv.innerHTML = `
                     <div class="success">
-                        ✅ <strong>SUCCESS!</strong> Your form has been filled and downloaded!<br>
-                        📁 <strong>File location:</strong> D:\\\\Completed Docs\\\\${filename}<br>
-                        📊 <strong>File size:</strong> ${(blob.size / 1024).toFixed(1)} KB<br><br>
-                        <strong>If the download didn\\'t start automatically:</strong><br>
-                        <a href="${url}" download="${filename}" style="color: #007bff; text-decoration: underline;">Click here to download manually</a>
+                        ✅ <strong>SUCCESS!</strong> Your form has been processed and downloaded!<br>
+                        📁 <strong>File:</strong> ${filename}<br>
+                        📊 <strong>File size:</strong> ${(blob.size / 1024).toFixed(1)} KB<br>
+                        📝 <strong>Fields filled:</strong> ${fieldsFilled} | <strong>Fields skipped:</strong> ${fieldsSkipped}<br><br>
+                        <strong>Location:</strong> D:\\\\Completed Docs (or your default download folder)<br>
+                        <a href="${url}" download="${filename}" style="color: #007bff; text-decoration: underline;">Click here if download didn\\'t start</a>
                     </div>
                 `;
+                
+                // Get detailed processing report
+                if (sessionId) {
+                    try {
+                        const reportResponse = await fetch(`/api/processing-report/${sessionId}`);
+                        if (reportResponse.ok) {
+                            const reportData = await reportResponse.json();
+                            displayProcessingReport(reportData.processing_report);
+                        }
+                    } catch (e) {
+                        console.log('Could not fetch detailed report:', e);
+                    }
+                }
                 
                 console.log('✅ Download process completed');
                 
             } catch (error) {
                 console.error('❌ Error:', error);
-                resultDiv.innerHTML = `<div class="error">❌ <strong>Error:</strong> ${error.message}<br><br>Please check that:<br>• Your PDF file is valid<br>• Your internet connection is working<br>• Try refreshing the page</div>`;
+                resultDiv.innerHTML = `<div class="error">❌ <strong>Error:</strong> ${error.message}<br><br>Please check that:<br>• Your file is a valid PDF or Word document<br>• Your internet connection is working<br>• Try refreshing the page</div>`;
             } finally {
                 submitBtn.disabled = false;
                 submitBtn.textContent = 'Fill Form & Download';
             }
         });
+        
+        function displayProcessingReport(report) {
+            if (!report || report.length === 0) return;
+            
+            const reportDiv = document.getElementById('processingReport');
+            let reportHtml = '<div class="report"><h4>📋 Processing Report:</h4>';
+            
+            report.forEach(item => {
+                let className = '';
+                if (item.startsWith('✅')) className = 'filled';
+                else if (item.startsWith('⚪')) className = 'skipped';
+                else if (item.startsWith('❌')) className = 'failed';
+                
+                reportHtml += `<div class="report-item ${className}">${item}</div>`;
+            });
+            
+            reportHtml += '</div>';
+            reportDiv.innerHTML = reportHtml;
+        }
         
         // Load Nael's data automatically on page load
         window.addEventListener('load', function() {
