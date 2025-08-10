@@ -1,0 +1,57 @@
+SAMIA'S STANDALONE FORM FILLER - SETUP INSTRUCTIONS
+==================================================
+
+WHAT YOU GET:
+- A complete form filler that runs on YOUR computer
+- NO dependency on my URLs or servers
+- Direct saving to D:\Completed Docs
+- Works offline once installed
+
+INSTALLATION (ONE TIME ONLY):
+
+1. INSTALL PYTHON:
+   - Go to python.org
+   - Download Python 3.11 or newer
+   - During installation, CHECK "Add Python to PATH"
+
+2. INSTALL REQUIRED LIBRARIES:
+   Open Command Prompt (Windows + R, type "cmd") and run:
+   
+   pip install fastapi uvicorn PyMuPDF python-docx
+
+3. SAVE THE SCRIPT:
+   - Save "STANDALONE_FORM_FILLER.py" to your Desktop or Documents folder
+
+HOW TO USE:
+
+1. DOUBLE-CLICK "STANDALONE_FORM_FILLER.py"
+   - A black window will appear (this is normal)
+   - Your browser will automatically open to the form filler
+
+2. USE THE FORM FILLER:
+   - Upload any PDF form
+   - Click "Load Nael's Data" or paste other person's info
+   - Click "Fill Form & Save to D:\Completed Docs"
+   - The filled form appears in D:\Completed Docs
+
+3. TO STOP THE PROGRAM:
+   - Close the black command window
+   - Or press Ctrl+C in the command window
+
+BENEFITS:
+✅ Runs entirely on YOUR computer
+✅ No internet required (except for initial install)
+✅ No dependency on my servers or URLs
+✅ Files save directly to D:\Completed Docs
+✅ Works with any PDF form
+✅ Process unlimited forms
+✅ Perfect for your business helping others
+
+TROUBLESHOOTING:
+- If Python is not found: Reinstall Python with "Add to PATH" checked
+- If libraries fail to install: Run "pip install --upgrade pip" first
+- If browser doesn't open: Go to http://localhost:8000 manually
+- If D:\Completed Docs access denied: Run as Administrator
+
+THIS IS YOUR COMPLETE, INDEPENDENT SOLUTION!
+No more dependency on preview URLs or my servers.
