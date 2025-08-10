@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>SAMIA - Direct PDF Download Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        button { background: #007bff; color: white; padding: 15px 30px; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; margin: 10px; }
+        button:hover { background: #0056b3; }
+        .success { color: green; font-weight: bold; }
+        .error { color: red; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>SAMIA - PDF Form Filler Test</h1>
+    <p><strong>This will force a download to: D:\Completed Docs</strong></p>
+    
+    <h2>Method 1: Direct Link (No JavaScript)</h2>
+    <a href="/api/download-test/samia_direct" download="samia_form.pdf">
+        <button>Direct Download Link</button>
+    </a>
+    
+    <h2>Method 2: Form Submission</h2>
+    <form action="/api/fill-form" method="POST" enctype="multipart/form-data">
+        <input type="hidden" name="data" value="Last Name: ALSQOUR
+First Name: NAEL OMAR MOHAMMAD
+Current Address: 3100 Van Buren Blvd Apt 611, Riverside, CA 92503
+Mobile Phone: +1 (832) 757-3013
+Driver's License #: W9493684
+Position Applying For: Driver
+Salary Desired: $20/hour">
+        
+        <p>Upload PDF Form:</p>
+        <input type="file" name="file" accept=".pdf" required>
+        <br><br>
+        <button type="submit">Fill Form & Download</button>
+    </form>
+    
+    <h2>Method 3: Force Download via JavaScript</h2>
+    <button onclick="forceDownload()">Force JavaScript Download</button>
+    
+    <div id="result"></div>
+
+    <script>
+        async function forceDownload() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '<p>Testing forced download...</p>';
+            
+            try {
+                // Force download via multiple methods
+                const response = await fetch('/api/download-test/samia_js');
+                
+                if (response.ok) {
+                    const blob = await response.blob();
+                    
+                    // Method 1: Standard download
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'samia_test_download.pdf';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                    
+                    // Method 2: Force new window
+                    setTimeout(() => {
+                        window.open(url, '_blank');
+                    }, 500);
+                    
+                    resultDiv.innerHTML = '<p class="success">✅ Download methods executed! Check D:\\Completed Docs</p>';
+                } else {
+                    throw new Error('Download failed');
+                }
+            } catch (error) {
+                resultDiv.innerHTML = '<p class="error">❌ Error: ' + error.message + '</p>';
+            }
+        }
+        
+        // Check if downloads are blocked
+        window.addEventListener('load', function() {
+            const testDiv = document.getElementById('result');
+            testDiv.innerHTML = '<p><strong>Browser Info:</strong> ' + navigator.userAgent + '</p>';
+            testDiv.innerHTML += '<p><strong>Download location should be:</strong> D:\\Completed Docs</p>';
+        });
+    </script>
+</body>
+</html>
