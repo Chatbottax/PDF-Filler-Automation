@@ -209,14 +209,14 @@ def parse_personal_data(raw_data: str) -> PersonalData:
 
 
 def fill_pdf_form(pdf_path: str, personal_data: PersonalData) -> str:
-    """Fill PDF form fields with personal data."""
+    """Fill PDF form fields with personal data using EXACT field names."""
     doc = fitz.open(pdf_path)
     
-    # Create field mapping
+    # EXACT field mapping based on actual PDF field names
     field_mapping = {
-        # Personal Information
-        'Name legal': personal_data.first_name,
-        'rst': personal_data.last_name,
+        # Page 1 - Personal Information
+        'Name legal': personal_data.last_name,
+        'rst': personal_data.first_name, 
         'F': personal_data.first_name,
         'Middle': personal_data.middle_name,
         'Other names under which you have worked or used for educational purposes': personal_data.other_names,
@@ -225,9 +225,10 @@ def fill_pdf_form(pdf_path: str, personal_data: PersonalData) -> str:
         'Mobile Phone': personal_data.mobile_phone,
         'Email': personal_data.email,
         'Drivers License': personal_data.drivers_license,
-        "Driver's License": personal_data.drivers_license,
+        'Employee': personal_data.how_heard_about_us,
         
-        # Employment desired
+        # Page 2 - Position and Education  
+        'Last Name First Name': f"{personal_data.first_name} {personal_data.last_name}",
         'Position Applying for': personal_data.position_applying,
         'Salary desired': personal_data.salary_desired,
         
@@ -247,11 +248,12 @@ def fill_pdf_form(pdf_path: str, personal_data: PersonalData) -> str:
         
         # License Information
         'Type': personal_data.license_type,
-        'No': personal_data.license_number,
+        'No_3': personal_data.license_number,
         'State': personal_data.license_state,
         'Exp': personal_data.license_expiration,
         
-        # Employment History
+        # Page 3 - Employment History
+        'Last Name First Name_2': f"{personal_data.first_name} {personal_data.last_name}",
         'Employer Name and Address': personal_data.employer1_name,
         'Indicate Month and year From': personal_data.employer1_dates_from,
         'To': personal_data.employer1_dates_to,
@@ -260,14 +262,20 @@ def fill_pdf_form(pdf_path: str, personal_data: PersonalData) -> str:
         'Reason For Leaving': personal_data.employer1_reason_leaving,
         
         # Second employer
-        'Employer Name and Address_2': personal_data.employer2_name,
+        'Employer Name and Address May we contact Yes No': personal_data.employer2_name,
         'Indicate Month and year From_2': personal_data.employer2_dates_from,
         'To_2': personal_data.employer2_dates_to,
+        'Supervisors Name Title_2': personal_data.employer2_supervisor,
         'Position TitleJob Duties_2': personal_data.employer2_position,
         'Reason For Leaving_2': personal_data.employer2_reason_leaving,
+        
+        # Page 4 - Signature
+        'Last Name First Name_3': f"{personal_data.first_name} {personal_data.last_name}",
+        'Date': datetime.now().strftime('%m/%d/%Y'),
     }
     
     # Fill form fields
+    filled_count = 0
     for page_num in range(len(doc)):
         page = doc[page_num]
         widgets = list(page.widgets())
@@ -279,6 +287,9 @@ def fill_pdf_form(pdf_path: str, personal_data: PersonalData) -> str:
             if field_value and widget.field_type == fitz.PDF_WIDGET_TYPE_TEXT:
                 widget.field_value = str(field_value)
                 widget.update()
+                filled_count += 1
+    
+    print(f"Filled {filled_count} out of {len(field_mapping)} mapped fields")
     
     # Save filled PDF to temp directory
     output_path = Path(tempfile.gettempdir()) / f"filled_form_{uuid.uuid4()}.pdf"
