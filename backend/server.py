@@ -552,13 +552,12 @@ async def test_download():
 </html>'''
     return HTMLResponse(content=html_content)
 
-@app.get("/content.pdf")
-async def get_content_pdf():
-    """Serve the content PDF file for testing."""
-    content_pdf = ROOT_DIR / "content.pdf"
-    if not content_pdf.exists():
-        raise HTTPException(status_code=404, detail="Content PDF not found")
-    return FileResponse(str(content_pdf), media_type="application/pdf")
+@app.get("/simple-test")
+async def simple_test():
+    """Simple test page with multiple download methods."""
+    with open(ROOT_DIR / "simple_test.html", "r") as f:
+        html_content = f.read()
+    return HTMLResponse(content=html_content)
 
 # Include the router in the main app
 app.include_router(api_router)
