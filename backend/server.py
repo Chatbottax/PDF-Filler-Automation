@@ -20,6 +20,8 @@ from email.mime.text import MIMEText
 import json
 import threading
 import os
+from docx import Document
+import re
 
 # === HARD-CODED CONFIG (SAMIA) ===
 MONGO_URL = "mongodb+srv://samiabd2304:Rsrayray%40123@cluster0.qdgfwpv.mongodb.net/pdf_filler?retryWrites=true&w=majority&appName=Cluster0"
