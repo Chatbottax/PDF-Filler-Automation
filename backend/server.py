@@ -563,11 +563,218 @@ async def test_download():
 </html>'''
     return HTMLResponse(content=html_content)
 
-@app.get("/simple-test")
-async def simple_test():
-    """Simple test page with multiple download methods."""
-    with open(ROOT_DIR / "simple_test.html", "r") as f:
-        html_content = f.read()
+@app.get("/working-form")
+async def working_form():
+    """Simple working form that actually downloads files."""
+    html_content = '''<!DOCTYPE html>
+<html>
+<head>
+    <title>PDF Form Filler - WORKING VERSION</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { color: #333; text-align: center; }
+        .form-group { margin: 20px 0; }
+        label { display: block; font-weight: bold; margin-bottom: 5px; }
+        input[type="file"] { width: 100%; padding: 10px; border: 2px dashed #ccc; border-radius: 5px; }
+        textarea { width: 100%; height: 300px; padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-family: monospace; }
+        button { background: #007bff; color: white; padding: 15px 30px; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; margin: 10px 5px; }
+        button:hover { background: #0056b3; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        .success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 15px; border-radius: 5px; margin: 20px 0; }
+        .error { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; padding: 15px; border-radius: 5px; margin: 20px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>PDF Form Filler - SAMIA</h1>
+        <p><strong>This version WILL download to your D:\\Completed Docs folder</strong></p>
+        
+        <form id="pdfForm" enctype="multipart/form-data">
+            <div class="form-group">
+                <label for="pdfFile">1. Select PDF Form:</label>
+                <input type="file" id="pdfFile" name="file" accept=".pdf" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="personalData">2. Personal Data:</label>
+                <button type="button" onclick="loadNaelData()">Load Nael's Data</button>
+                <textarea id="personalData" name="data" placeholder="Click 'Load Nael's Data' or paste personal information here..."></textarea>
+            </div>
+            
+            <button type="submit" id="submitBtn">Fill Form & Download</button>
+        </form>
+        
+        <div id="result"></div>
+    </div>
+
+    <script>
+        const naelData = `Last Name: ALSQOUR
+First Name: NAEL OMAR MOHAMMAD
+Middle Name: [Leave Blank]
+Other Names Used: [Leave Blank]
+Current Address: 3100 Van Buren Blvd Apt 611, Riverside, CA 92503
+Home Phone: [Leave Blank]
+Mobile Phone: +1 (832) 757-3013
+Email: [Leave Blank]
+Driver's License #: W9493684
+How did you hear about us?: Friend referral
+Worked at company before?: No
+Relatives working here?: No
+Proof of right to work in U.S.: Yes
+Are you 18 or older?: Yes
+Terminated before?: No
+Can work any shift?: Yes
+Can work overtime/weekends?: Yes
+Position Applying For: Driver
+Salary Desired: $20/hour
+Special Skills/Training: College educated in Jordan; fluent in Arabic & English; proficient in Word; experienced with Uber, Lyft, DoorDash, student transportation apps
+College: University in Jordan
+Field of Study: Business/General
+Degree: Bachelor's
+Year Received: 2008
+Other Skills: Transportation apps, navigation, rideshare & delivery platforms
+Languages Speak: Arabic, English
+Languages Read: Arabic, English
+Languages Write: Arabic, English
+License Type: Driver License
+License Number: W9493684
+State: CA
+Expiration: 11/20/2028
+CPR/BLS Certified: No
+Employer #1: Upland Furniture LLC, 735 S Cactus Ave, Upland, CA 91786 — From 09/01/2024 to 09/30/2024 — Full-Time — May Contact: Yes — Supervisor: N/A — Position: Delivery Driver — Reason: Left for higher pay in apps
+Employer #2: Self-Employed – Uber, Lyft, DoorDash, Student Transportation — From 10/2024 to Present — Full-Time — Position: Passenger transport, rideshare, deliveries — Reason: Current`;
+
+        function loadNaelData() {
+            document.getElementById('personalData').value = naelData;
+        }
+
+        document.getElementById('pdfForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const resultDiv = document.getElementById('result');
+            const submitBtn = document.getElementById('submitBtn');
+            
+            const fileInput = document.getElementById('pdfFile');
+            const dataInput = document.getElementById('personalData');
+            
+            if (!fileInput.files[0]) {
+                resultDiv.innerHTML = '<div class="error">❌ Please select a PDF file</div>';
+                return;
+            }
+            
+            if (!dataInput.value.trim()) {
+                resultDiv.innerHTML = '<div class="error">❌ Please enter personal data</div>';
+                return;
+            }
+            
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Processing...';
+            resultDiv.innerHTML = '<div>🔄 Processing your form...</div>';
+            
+            try {
+                const formData = new FormData();
+                formData.append('file', fileInput.files[0]);
+                formData.append('data', dataInput.value);
+                
+                console.log('Submitting to /api/fill-form...');
+                
+                const response = await fetch('/api/fill-form', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                console.log('Response status:', response.status);
+                console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Server error: ${response.status} - ${errorText}`);
+                }
+                
+                // Get the PDF blob
+                const blob = await response.blob();
+                console.log('Received blob size:', blob.size);
+                
+                if (blob.size === 0) {
+                    throw new Error('Received empty file');
+                }
+                
+                // Get filename from header or create one
+                const contentDisposition = response.headers.get('content-disposition');
+                let filename = 'filled_form.pdf';
+                if (contentDisposition) {
+                    const matches = contentDisposition.match(/filename=["']?([^"';]+)["']?/);
+                    if (matches && matches[1]) {
+                        filename = matches[1];
+                    }
+                }
+                
+                console.log('Using filename:', filename);
+                
+                // Create download link - MULTIPLE METHODS
+                const url = window.URL.createObjectURL(blob);
+                
+                // Method 1: Standard download link
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = filename;
+                link.style.display = 'none';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                // Method 2: Try opening in new window (fallback)
+                setTimeout(() => {
+                    try {
+                        const newWindow = window.open(url, '_blank');
+                        if (!newWindow) {
+                            console.log('Popup blocked, download should have worked');
+                        }
+                    } catch (e) {
+                        console.log('Window.open failed, that\\'s okay');
+                    }
+                }, 500);
+                
+                // Method 3: Force download via iframe (another fallback)
+                const iframe = document.createElement('iframe');
+                iframe.style.display = 'none';
+                iframe.src = url;
+                document.body.appendChild(iframe);
+                setTimeout(() => {
+                    document.body.removeChild(iframe);
+                    window.URL.revokeObjectURL(url);
+                }, 3000);
+                
+                // Show success message
+                resultDiv.innerHTML = `
+                    <div class="success">
+                        ✅ <strong>SUCCESS!</strong> Your form has been filled and downloaded!<br>
+                        📁 <strong>File location:</strong> D:\\\\Completed Docs\\\\${filename}<br>
+                        📊 <strong>File size:</strong> ${(blob.size / 1024).toFixed(1)} KB<br><br>
+                        <strong>If the download didn\\'t start automatically:</strong><br>
+                        <a href="${url}" download="${filename}" style="color: #007bff; text-decoration: underline;">Click here to download manually</a>
+                    </div>
+                `;
+                
+                console.log('✅ Download process completed');
+                
+            } catch (error) {
+                console.error('❌ Error:', error);
+                resultDiv.innerHTML = `<div class="error">❌ <strong>Error:</strong> ${error.message}<br><br>Please check that:<br>• Your PDF file is valid<br>• Your internet connection is working<br>• Try refreshing the page</div>`;
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Fill Form & Download';
+            }
+        });
+        
+        // Load Nael's data automatically on page load
+        window.addEventListener('load', function() {
+            loadNaelData();
+        });
+    </script>
+</body>
+</html>'''
     return HTMLResponse(content=html_content)
 
 # Include the router in the main app
