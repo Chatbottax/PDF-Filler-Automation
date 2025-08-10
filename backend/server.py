@@ -210,27 +210,35 @@ def parse_personal_data(raw_data: str) -> PersonalData:
     return data
 
 
-def fill_pdf_form(pdf_path: str, personal_data: PersonalData) -> str:
-    """Fill PDF form fields with personal data using EXACT field names."""
+def fill_pdf_form(pdf_path: str, personal_data: PersonalData) -> tuple[str, list]:
+    """Fill PDF form fields with personal data using EXACT field names - FIXED VERSION."""
     doc = fitz.open(pdf_path)
     
-    # EXACT field mapping based on actual PDF field names
+    # FIXED: Proper name parsing
+    full_name = f"{personal_data.first_name} {personal_data.last_name}".strip()
+    name_parts = personal_data.first_name.split()
+    first_name_only = name_parts[0] if name_parts else personal_data.first_name
+    
+    filled_report = []
+    skipped_report = []
+    
+    # EXACT field mapping based on actual PDF field names - CORRECTED
     field_mapping = {
-        # Page 1 - Personal Information
-        'Name legal': personal_data.last_name,
-        'rst': personal_data.first_name, 
-        'F': personal_data.first_name,
-        'Middle': personal_data.middle_name,
-        'Other names under which you have worked or used for educational purposes': personal_data.other_names,
+        # Page 1 - Personal Information - FIXED NAME MAPPING
+        'Name legal': personal_data.last_name,  # Last name only
+        'rst': first_name_only,  # First name only 
+        'F': personal_data.first_name,  # Full first name
+        'Middle': personal_data.middle_name if personal_data.middle_name not in ['[Leave Blank]', ''] else '',
+        'Other names under which you have worked or used for educational purposes': personal_data.other_names if personal_data.other_names not in ['[Leave Blank]', ''] else '',
         'Your Current Address': personal_data.current_address,
-        'Home Phone': personal_data.home_phone,
+        'Home Phone': personal_data.home_phone if personal_data.home_phone not in ['[Leave Blank]', ''] else '',
         'Mobile Phone': personal_data.mobile_phone,
-        'Email': personal_data.email,
+        'Email': personal_data.email if personal_data.email not in ['[Leave Blank]', ''] else '',
         'Drivers License': personal_data.drivers_license,
         'Employee': personal_data.how_heard_about_us,
         
         # Page 2 - Position and Education  
-        'Last Name First Name': f"{personal_data.first_name} {personal_data.last_name}",
+        'Last Name First Name': full_name,
         'Position Applying for': personal_data.position_applying,
         'Salary desired': personal_data.salary_desired,
         
@@ -255,11 +263,11 @@ def fill_pdf_form(pdf_path: str, personal_data: PersonalData) -> str:
         'Exp': personal_data.license_expiration,
         
         # Page 3 - Employment History
-        'Last Name First Name_2': f"{personal_data.first_name} {personal_data.last_name}",
+        'Last Name First Name_2': full_name,
         'Employer Name and Address': personal_data.employer1_name,
         'Indicate Month and year From': personal_data.employer1_dates_from,
         'To': personal_data.employer1_dates_to,
-        'Supervisors Name Title': personal_data.employer1_supervisor,
+        'Supervisors Name Title': personal_data.employer1_supervisor if personal_data.employer1_supervisor not in ['N/A', ''] else '',
         'Position TitleJob Duties': personal_data.employer1_position,
         'Reason For Leaving': personal_data.employer1_reason_leaving,
         
@@ -267,12 +275,12 @@ def fill_pdf_form(pdf_path: str, personal_data: PersonalData) -> str:
         'Employer Name and Address May we contact Yes No': personal_data.employer2_name,
         'Indicate Month and year From_2': personal_data.employer2_dates_from,
         'To_2': personal_data.employer2_dates_to,
-        'Supervisors Name Title_2': personal_data.employer2_supervisor,
+        'Supervisors Name Title_2': personal_data.employer2_supervisor if hasattr(personal_data, 'employer2_supervisor') else '',
         'Position TitleJob Duties_2': personal_data.employer2_position,
         'Reason For Leaving_2': personal_data.employer2_reason_leaving,
         
         # Page 4 - Signature
-        'Last Name First Name_3': f"{personal_data.first_name} {personal_data.last_name}",
+        'Last Name First Name_3': full_name,
         'Date': datetime.now().strftime('%m/%d/%Y'),
     }
     
@@ -286,19 +294,119 @@ def fill_pdf_form(pdf_path: str, personal_data: PersonalData) -> str:
             field_name = widget.field_name
             field_value = field_mapping.get(field_name, "")
             
-            if field_value and widget.field_type == fitz.PDF_WIDGET_TYPE_TEXT:
-                widget.field_value = str(field_value)
-                widget.update()
-                filled_count += 1
+            if widget.field_type == fitz.PDF_WIDGET_TYPE_TEXT:
+                if field_value:
+                    try:
+                        widget.field_value = str(field_value)
+                        widget.update()
+                        filled_count += 1
+                        filled_report.append(f"✅ {field_name}: {field_value}")
+                    except Exception as e:
+                        skipped_report.append(f"❌ Failed to fill '{field_name}': {str(e)}")
+                else:
+                    skipped_report.append(f"⚪ Skipped '{field_name}': No matching data provided")
     
-    print(f"Filled {filled_count} out of {len(field_mapping)} mapped fields")
+    print(f"Filled {filled_count} fields")
     
     # Save filled PDF to temp directory
     output_path = Path(tempfile.gettempdir()) / f"filled_form_{uuid.uuid4()}.pdf"
     doc.save(str(output_path))
     doc.close()
     
-    return str(output_path)
+    return str(output_path), filled_report + skipped_report
+
+
+def fill_word_form(word_path: str, personal_data: PersonalData) -> tuple[str, list]:
+    """Fill Word document form fields with personal data."""
+    try:
+        doc = Document(word_path)
+        filled_report = []
+        skipped_report = []
+        
+        # Create replacement mappings
+        full_name = f"{personal_data.first_name} {personal_data.last_name}".strip()
+        name_parts = personal_data.first_name.split()
+        first_name_only = name_parts[0] if name_parts else personal_data.first_name
+        
+        replacements = {
+            '[LAST_NAME]': personal_data.last_name,
+            '[FIRST_NAME]': first_name_only,
+            '[FULL_FIRST_NAME]': personal_data.first_name,
+            '[FULL_NAME]': full_name,
+            '[MIDDLE_NAME]': personal_data.middle_name if personal_data.middle_name not in ['[Leave Blank]', ''] else '',
+            '[ADDRESS]': personal_data.current_address,
+            '[MOBILE_PHONE]': personal_data.mobile_phone,
+            '[EMAIL]': personal_data.email if personal_data.email not in ['[Leave Blank]', ''] else '',
+            '[DRIVERS_LICENSE]': personal_data.drivers_license,
+            '[POSITION]': personal_data.position_applying,
+            '[SALARY]': personal_data.salary_desired,
+            '[COLLEGE]': personal_data.college_name,
+            '[DEGREE]': personal_data.degree,
+            '[FIELD_OF_STUDY]': personal_data.field_of_study,
+            '[YEAR_RECEIVED]': personal_data.year_received,
+            '[SKILLS]': personal_data.special_skills,
+            '[LANGUAGES_SPEAK]': personal_data.languages_speak,
+            '[LANGUAGES_READ]': personal_data.languages_read,
+            '[LANGUAGES_WRITE]': personal_data.languages_write,
+            '[LICENSE_TYPE]': personal_data.license_type,
+            '[LICENSE_NUMBER]': personal_data.license_number,
+            '[LICENSE_STATE]': personal_data.license_state,
+            '[LICENSE_EXP]': personal_data.license_expiration,
+            '[EMPLOYER1]': personal_data.employer1_name,
+            '[EMPLOYER1_FROM]': personal_data.employer1_dates_from,
+            '[EMPLOYER1_TO]': personal_data.employer1_dates_to,
+            '[EMPLOYER1_POSITION]': personal_data.employer1_position,
+            '[EMPLOYER1_REASON]': personal_data.employer1_reason_leaving,
+            '[EMPLOYER2]': personal_data.employer2_name,
+            '[EMPLOYER2_FROM]': personal_data.employer2_dates_from,
+            '[EMPLOYER2_TO]': personal_data.employer2_dates_to,
+            '[EMPLOYER2_POSITION]': personal_data.employer2_position,
+            '[EMPLOYER2_REASON]': personal_data.employer2_reason_leaving,
+            '[DATE]': datetime.now().strftime('%m/%d/%Y'),
+        }
+        
+        # Replace in paragraphs
+        filled_count = 0
+        for paragraph in doc.paragraphs:
+            original_text = paragraph.text
+            new_text = original_text
+            
+            for placeholder, value in replacements.items():
+                if placeholder in new_text:
+                    new_text = new_text.replace(placeholder, str(value) if value else '')
+                    filled_count += 1
+                    filled_report.append(f"✅ Replaced {placeholder} with: {value}")
+            
+            if new_text != original_text:
+                paragraph.text = new_text
+        
+        # Replace in tables
+        for table in doc.tables:
+            for row in table.rows:
+                for cell in row.cells:
+                    original_text = cell.text
+                    new_text = original_text
+                    
+                    for placeholder, value in replacements.items():
+                        if placeholder in new_text:
+                            new_text = new_text.replace(placeholder, str(value) if value else '')
+                            filled_count += 1
+                            filled_report.append(f"✅ Replaced {placeholder} with: {value}")
+                    
+                    if new_text != original_text:
+                        cell.text = new_text
+        
+        # Save filled Word document
+        output_path = Path(tempfile.gettempdir()) / f"filled_form_{uuid.uuid4()}.docx"
+        doc.save(str(output_path))
+        
+        if filled_count == 0:
+            skipped_report.append("⚠️ No placeholders found. Word document may need manual filling or different placeholder format.")
+        
+        return str(output_path), filled_report + skipped_report
+        
+    except Exception as e:
+        return None, [f"❌ Error processing Word document: {str(e)}"]
 
 
 # API Routes
